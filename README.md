@@ -1,30 +1,94 @@
+![Local AI Bridge Icon](media/icon.png)
+
 # Local AI Bridge (VS Code Extension)
 
-`local-ai-bridge` starts a localhost server inside VS Code and exposes:
+Local AI Bridge runs a localhost server inside VS Code and exposes chat-capable `vscode.lm` models through:
 
-- a browser chat UI at `http://127.0.0.1:<port>/`
-- HTTP/WebSocket endpoints for external web clients
-- streamed responses from providers available through `vscode.lm`
+- HTTP/WebSocket endpoints for local clients
+- streamed responses (SSE or WebSocket)
+- a built-in browser chat UI at `http://127.0.0.1:<port>/`
 
-The bridge is provider-agnostic: it uses `vscode.lm.selectChatModels()` and does not hardcode model vendors.
+The bridge is provider-agnostic. It discovers models via `vscode.lm.selectChatModels()` and does not hardcode model vendors.
 
-## Features
+## Highlights
 
 - Binds to `127.0.0.1` only (never `0.0.0.0`)
-- Start/stop from Command Palette:
+- Activity Bar integration with a dedicated **Local AI Bridge** icon
+- Native collapsible sidebar sections:
+  - `Connection` (status + Start/Stop)
+  - `Controls` (port/transport/autoStart + Save/Reset)
+  - `Event Logs` (live bridge events)
+- Command Palette support:
   - `Local AI: Start Server`
   - `Local AI: Stop Server`
-- Configurable port, transport, and auto-start
-- Streaming via:
-  - SSE (`EventSource`)
-  - WebSocket
-- Built-in UI plus standalone external demo client
+- Streaming transport modes:
+  - SSE (`/chat/stream`)
+  - WebSocket (`/chat/ws`)
+- Built-in UI + standalone external demo web app
+
+## Screenshots
+
+### Extension Sidebar
+
+![Extension Sidebar](media/extension_look.png)
+
+### Demo Web Client
+
+![Demo Web Client](media/demo_look.png)
 
 ## Requirements
 
 - VS Code `^1.95.0`
-- Node.js 18+ recommended
-- At least one VS Code extension that exposes chat models via `vscode.lm`
+- Node.js 18+ (recommended for local build)
+- At least one VS Code extension that exposes models through `vscode.lm`
+
+## Install as a VS Code Extension
+
+### Option 1: Development Host (fastest)
+
+1. Open this project in VS Code.
+2. Run:
+   ```bash
+   npm install
+   npm run compile
+   ```
+3. Press `F5` to launch an Extension Development Host window.
+4. In the host window, click the **Local AI Bridge** icon in the Activity Bar.
+
+### Option 2: Package + install VSIX
+
+1. Build and package:
+   ```bash
+   npm install
+   npm run compile
+   npx @vscode/vsce package
+   ```
+2. Install:
+   - Command Palette: `Extensions: Install from VSIX...`
+   - choose the generated `.vsix` (for example `local-ai-bridge-0.0.1.vsix`)
+3. Reload VS Code and open the **Local AI Bridge** Activity Bar view.
+
+## Sidebar Usage
+
+### Connection
+
+- Shows current status (`Ready` / `Stopped` / error)
+- Shows URL, transport, and port
+- `Start` and `Stop` control the bridge server
+
+### Controls
+
+- Edit runtime settings:
+  - `Port`
+  - `Transport` (`sse` or `websocket`)
+  - `Auto start on launch`
+- `Save` persists settings
+- `Reset` re-syncs fields from current extension state
+
+### Event Logs
+
+- Displays live bridge-wide events (`/events`)
+- Includes request/response, stream, and connection lifecycle logs
 
 ## Settings
 
@@ -38,21 +102,9 @@ The bridge is provider-agnostic: it uses `vscode.lm.selectChatModels()` and does
 
 - `localAI.transport`: `"sse"` or `"websocket"` (default: `"sse"`)
 - `localAI.port`: `1024-65535` (default: `3000`)
-- `localAI.autoStart`: start on VS Code launch
+- `localAI.autoStart`: starts server on VS Code launch
 
-Changing `localAI.port` or `localAI.transport` restarts the running server automatically.
-
-## Quick Start
-
-1. Open `local-ai-bridge` in VS Code.
-2. Run:
-   ```bash
-   npm install
-   npm run compile
-   ```
-3. Press `F5` to open an Extension Development Host.
-4. In that window, run `Local AI: Start Server`.
-5. Open `http://127.0.0.1:<port>/` (replace `<port>` with `localAI.port`).
+If the server is running, changing `localAI.port` or `localAI.transport` restarts it automatically.
 
 ## UI Options
 
@@ -60,76 +112,30 @@ Use either client depending on your goal:
 
 - Built-in UI (`webview/index.html`)
   - URL: `http://127.0.0.1:<port>/`
-  - Best for quick validation of the extension itself
-  - Event Logs panel shows bridge-wide activity via `/events` (including traffic from `demo-web` and other clients)
+  - Best for quick validation of extension behavior
 - External demo web (`demo-web/index.html`)
-  - Run: `npm run demo:web`
+  - Run: `npm run demo`
   - URL: `http://127.0.0.1:3001`
-  - Best for testing a real external browser app against the bridge API
+  - Best for testing an external browser app against the bridge API
 
-## Testing Connection (Demo Web)
-
-Use this section to verify that an external browser app can connect to the Local AI Bridge and stream responses.
-
-1. Start the extension server.
-   - Open this project in VS Code.
-   - Press `F5` (Extension Development Host).
-   - In the new window, run `Local AI: Start Server`.
-2. Start demo web.
-   - In this project folder, run:
-     ```bash
-     npm run demo:web
-     ```
-   - Open `http://127.0.0.1:3001`.
-3. Configure connection in demo web.
-   - Set `Bridge URL` to `http://127.0.0.1:<port>` (`<port>` = your `localAI.port`).
-   - Set `Transport` to `Auto` (or explicitly choose `SSE` / `WebSocket`).
-   - Click `Connect`.
-4. Validate model + chat stream.
-   - Click `Refresh Models` and confirm at least one model appears.
-   - Send a prompt and confirm the assistant response arrives incrementally (streaming).
-   - Click `Stop` during a long response and confirm generation ends.
-
-Pass criteria:
-
-- Demo web status shows connected.
-- Model list loads successfully.
-- Prompt returns streamed chunks.
-- Stop action interrupts streaming.
-
-If it fails:
-
-- Check bridge URL/port match `localAI.port`.
-- Ensure at least one `vscode.lm` provider is installed and signed in.
-- Ensure transport setting matches available endpoint (`sse` vs `websocket`).
-
-## API
+## Quick API Reference
 
 Base URL: `http://127.0.0.1:<port>`
 
-- `GET /health`
-  - returns `{ "ok": true }`
-- `GET /config`
-  - returns `{ "transport": "sse|websocket", "port": <number> }`
-- `GET /models`
-  - returns `{ "models": [...] }`
+- `GET /health` -> `{ "ok": true }`
+- `GET /config` -> `{ "transport": "sse|websocket", "port": <number>, "version": "..." }`
+- `GET /models` -> `{ "models": [...] }`
 - `POST /chat`
   - request: `{ "prompt": "...", "model": "...", "clientId": "..." }`
-  - `prompt` required, `model` optional, `clientId` optional
-  - requires an active stream connection for the same `clientId`
   - response: `202 { "accepted": true, "clientId": "..." }`
 - `POST /chat/stop`
   - request: `{ "clientId": "..." }`
   - response: `{ "stopped": true|false, "clientId": "..." }`
-- `GET /chat/stream` (SSE mode only)
-  - URL: `/chat/stream?clientId=...`
-- `WS /chat/ws` (WebSocket mode only)
-  - URL: `ws://127.0.0.1:<port>/chat/ws?clientId=...`
+- `GET /chat/stream?clientId=...` (SSE mode only)
+- `WS /chat/ws?clientId=...` (WebSocket mode only)
   - optional client message: `{ "type": "stop" }`
 
-## Streaming Payload Contract
-
-The stream emits JSON chunks:
+### Stream payload contract
 
 ```json
 { "delta": "partial text", "done": false }
@@ -143,12 +149,12 @@ The stream emits JSON chunks:
 { "error": "message", "done": true }
 ```
 
-## Behavior Notes
+## Scripts
 
-- If no models are available:
-  - `/models` returns an empty `models` array
-  - `/chat` can be accepted, then the stream emits an error payload
-- If no stream connection exists for `clientId`, `POST /chat` returns `409`
+- `npm run compile` build TypeScript to `out/`
+- `npm run watch` TypeScript watch mode
+- `npm run demo` run external demo web at `http://127.0.0.1:3001`
+- `npm run vscode:prepublish` prepublish compile
 
 ## Architecture
 
@@ -163,27 +169,19 @@ vscode.lm stream
 
 Key files:
 
-- `src/extension.ts` activation, commands, config lifecycle
+- `src/extension.ts` activation, commands, config lifecycle, sidebar wiring
+- `src/sidebar.ts` Activity Bar multi-view webview UI
 - `src/server.ts` server bootstrap, localhost restriction, static/config routes
 - `src/routes/chat.ts` chat/model/stream routing and client sessions
 - `src/llm.ts` model lookup and token streaming from `vscode.lm`
 - `src/transport/*` transport implementations
-- `webview/index.html` built-in browser UI
-- `demo-web/index.html` standalone external demo UI
 
 ## Security
 
 - Server binds to localhost only
 - Non-local remote addresses are rejected
 - CORS is enabled for local web app interoperability
-- No authentication is implemented (intended for trusted local use)
-
-## Scripts
-
-- `npm run compile` build TypeScript to `out/`
-- `npm run watch` TypeScript watch mode
-- `npm run demo:web` serve external demo client at `http://127.0.0.1:3001`
-- `npm run vscode:prepublish` prepublish compile
+- No authentication (intended for trusted local use)
 
 ## Troubleshooting
 
@@ -192,6 +190,6 @@ Key files:
 - `409` on `POST /chat`:
   - connect stream endpoint first (`/chat/stream` or `/chat/ws`) with same `clientId`
 - Transport endpoint errors:
-  - ensure endpoint matches `localAI.transport` setting
+  - ensure endpoint matches `localAI.transport`
 - Port conflict:
-  - change `localAI.port` and restart
+  - change `localAI.port` and retry

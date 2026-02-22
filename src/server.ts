@@ -86,7 +86,8 @@ export class LocalAiServer {
     private readonly extensionPath: string,
     private readonly getConfig: () => LocalAiServerConfig,
     private readonly appVersion: string,
-    private readonly log: (message: string) => void
+    private readonly log: (message: string) => void,
+    private readonly onBridgeEvent?: (event: BridgeEvent) => void
   ) {}
 
   isRunning(): boolean {
@@ -112,10 +113,12 @@ export class LocalAiServer {
     this.eventHub = eventHub;
 
     const emitEvent = (event: Omit<BridgeEvent, "ts">): void => {
-      eventHub.emit({
+      const fullEvent: BridgeEvent = {
         ts: new Date().toISOString(),
         ...event,
-      });
+      };
+      eventHub.emit(fullEvent);
+      this.onBridgeEvent?.(fullEvent);
     };
 
     expressWs(app);

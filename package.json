@@ -13,6 +13,9 @@
   ],
   "activationEvents": [
     "onStartupFinished",
+    "onView:localAI.connection",
+    "onView:localAI.controls",
+    "onView:localAI.logs",
     "onCommand:localAI.startServer",
     "onCommand:localAI.stopServer"
   ],
@@ -28,6 +31,34 @@
         "title": "Local AI: Stop Server"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "localAI",
+          "title": "Local AI Bridge",
+          "icon": "media/local-ai-bridge-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "localAI": [
+        {
+          "id": "localAI.connection",
+          "name": "Connection",
+          "type": "webview"
+        },
+        {
+          "id": "localAI.controls",
+          "name": "Controls",
+          "type": "webview"
+        },
+        {
+          "id": "localAI.logs",
+          "name": "Event Logs",
+          "type": "webview"
+        }
+      ]
+    },
     "configuration": {
       "title": "Local AI Bridge",
       "properties": {
