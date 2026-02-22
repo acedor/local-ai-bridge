@@ -10,6 +10,16 @@ Local AI Bridge runs a localhost server inside VS Code and exposes chat-capable 
 
 The bridge is provider-agnostic. It discovers models via `vscode.lm.selectChatModels()` and does not hardcode model vendors.
 
+## Who Is This For?
+
+- Developers who want a local bridge between VS Code `vscode.lm` models and external clients
+- Teams validating chat integration behavior (streaming, stop/cancel, connection lifecycle)
+- Developers testing OpenAI-ready apps against local model providers with a thin adapter layer
+
+### Compatibility Note
+
+Local AI Bridge exposes a custom bridge API (`/chat`, `/models`, `/chat/stream`, `/chat/ws`), not a full OpenAI API clone. If your app expects OpenAI endpoints directly, add an adapter/proxy layer.
+
 ## Highlights
 
 - Binds to `127.0.0.1` only (never `0.0.0.0`)
