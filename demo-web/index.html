@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Local AI Bridge Demo Web</title>
+    <style>
+      :root {
+        --bg: #f4f6fa;
+        --panel: #ffffff;
+        --border: #d6dce8;
+        --text: #1d2433;
+        --muted: #647089;
+        --accent: #1f57d2;
+        --ok: #23844a;
+        --error: #af2e2e;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: linear-gradient(135deg, #e8efff 0%, #f9f8f2 100%);
+        color: var(--text);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      }
+
+      .container {
+        width: min(1100px, 100%);
+        margin: 0 auto;
+        min-height: 100vh;
+        padding: 16px;
+        display: grid;
+        grid-template-columns: 340px 1fr;
+        gap: 14px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px;
+      }
+
+      .controls {
+        display: grid;
+        align-content: start;
+        gap: 12px;
+      }
+
+      h1 {
+        font-size: 18px;
+        margin: 0;
+      }
+
+      .sub {
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 4px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      input,
+      select,
+      textarea,
+      button {
+        font: inherit;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 9px 10px;
+        background: #fff;
+        color: var(--text);
+      }
+
+      textarea {
+        min-height: 95px;
+        resize: vertical;
+      }
+
+      .buttons {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: 0;
+        border-radius: 8px;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      button.primary {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      button.secondary {
+        background: #edf1fb;
+        color: #253358;
+      }
+
+      button.warn {
+        background: #f7e8e8;
+        color: #8e2020;
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #b6c0d3;
+      }
+
+      .dot.ok {
+        background: var(--ok);
+      }
+
+      .dot.error {
+        background: var(--error);
+      }
+
+      .chat {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 12px;
+        min-height: 0;
+      }
+
+      .chat-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .chat-log {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: #f8faff;
+        padding: 12px;
+        overflow-y: auto;
+        min-height: 460px;
+      }
+
+      .msg {
+        max-width: 88%;
+        padding: 10px 11px;
+        border-radius: 10px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        margin-bottom: 10px;
+      }
+
+      .msg.user {
+        margin-left: auto;
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .msg.assistant {
+        margin-right: auto;
+        background: #eaf0ff;
+      }
+
+      .msg.error {
+        margin-right: auto;
+        background: #fbe9e9;
+        color: #8e2020;
+        border: 1px solid #e5bbbb;
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      @media (max-width: 960px) {
+        .container {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <section class="panel controls">
+        <div>
+          <h1>Local AI Demo Web</h1>
+          <div class="sub">External browser client for Local AI Bridge</div>
+        </div>
+
+        <label>
+          Bridge URL
+          <input id="baseUrl" value="http://127.0.0.1:3000" />
+        </label>
+
+        <label>
+          Transport
+          <select id="transport">
+            <option value="auto">Auto (/config)</option>
+            <option value="sse">SSE</option>
+            <option value="websocket">WebSocket</option>
+          </select>
+        </label>
+
+        <label>
+          Client ID
+          <input id="clientId" />
+        </label>
+
+        <div class="buttons">
+          <button id="connectBtn" class="primary" type="button">Connect</button>
+          <button id="disconnectBtn" class="secondary" type="button">Disconnect</button>
+        </div>
+
+        <div class="status">
+          <span id="statusDot" class="dot"></span>
+          <span id="statusText">Disconnected</span>
+        </div>
+
+        <label>
+          Model
+          <select id="modelSelect"></select>
+        </label>
+
+        <div class="buttons">
+          <button id="modelsBtn" class="secondary" type="button">Refresh Models</button>
+        </div>
+
+        <div class="small">
+          Flow: connect stream first, then send prompt.
+        </div>
+      </section>
+
+      <section class="panel chat">
+        <div class="chat-header">
+          <strong>Conversation</strong>
+          <span id="activeTransport" class="small">Transport: -</span>
+        </div>
+
+        <div id="chatLog" class="chat-log"></div>
+
+        <div>
+          <label>
+            Prompt
+            <textarea id="promptInput" placeholder="Ask anything..."></textarea>
+          </label>
+
+          <div class="buttons" style="margin-top: 8px">
+            <button id="sendBtn" class="primary" type="button">Send</button>
+            <button id="stopBtn" class="warn" type="button">Stop</button>
+            <button id="clearBtn" class="secondary" type="button">Clear</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      (() => {
+        const state = {
+          connectionType: "sse",
+          streamActive: false,
+          eventSource: null,
+          socket: null,
+          activeAssistantNode: null
+        };
+
+        const baseUrlInput = document.getElementById("baseUrl");
+        const transportSelect = document.getElementById("transport");
+        const clientIdInput = document.getElementById("clientId");
+        const connectBtn = document.getElementById("connectBtn");
+        const disconnectBtn = document.getElementById("disconnectBtn");
+        const statusDot = document.getElementById("statusDot");
+        const statusText = document.getElementById("statusText");
+        const activeTransport = document.getElementById("activeTransport");
+        const modelSelect = document.getElementById("modelSelect");
+        const modelsBtn = document.getElementById("modelsBtn");
+        const chatLog = document.getElementById("chatLog");
+        const promptInput = document.getElementById("promptInput");
+        const sendBtn = document.getElementById("sendBtn");
+        const stopBtn = document.getElementById("stopBtn");
+        const clearBtn = document.getElementById("clearBtn");
+
+        function initClientId() {
+          const storageKey = "local-ai-demo-client-id";
+          const existing = localStorage.getItem(storageKey);
+          if (existing) {
+            clientIdInput.value = existing;
+            return;
+          }
+
+          const generated = `demo-${Math.random().toString(36).slice(2, 10)}`;
+          localStorage.setItem(storageKey, generated);
+          clientIdInput.value = generated;
+        }
+
+        function getClientId() {
+          const id = clientIdInput.value.trim() || "demo-default";
+          localStorage.setItem("local-ai-demo-client-id", id);
+          return id;
+        }
+
+        function normalizeBaseUrl() {
+          const raw = baseUrlInput.value.trim() || "http://127.0.0.1:3000";
+          return raw.replace(/\/+$/, "");
+        }
+
+        function setStatus(text, mode) {
+          statusText.textContent = text;
+          statusDot.classList.remove("ok", "error");
+          if (mode === "ok") {
+            statusDot.classList.add("ok");
+          } else if (mode === "error") {
+            statusDot.classList.add("error");
+          }
+        }
+
+        function setStreamState(active) {
+          state.streamActive = active;
+          sendBtn.disabled = active;
+        }
+
+        function addMessage(role, text, extraClass) {
+          const node = document.createElement("div");
+          node.className = `msg ${role}${extraClass ? ` ${extraClass}` : ""}`;
+          node.textContent = text;
+          chatLog.appendChild(node);
+          chatLog.scrollTop = chatLog.scrollHeight;
+          return node;
+        }
+
+        function appendDelta(delta) {
+          if (!state.activeAssistantNode) {
+            state.activeAssistantNode = addMessage("assistant", "");
+          }
+
+          state.activeAssistantNode.textContent += delta;
+          chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        function finishStream() {
+          state.activeAssistantNode = null;
+          setStreamState(false);
+        }
+
+        function closeTransport() {
+          if (state.eventSource) {
+            state.eventSource.close();
+            state.eventSource = null;
+          }
+          if (state.socket) {
+            state.socket.close();
+            state.socket = null;
+          }
+          setStatus("Disconnected", undefined);
+        }
+
+        function isConnected() {
+          if (state.connectionType === "websocket") {
+            return state.socket && state.socket.readyState === WebSocket.OPEN;
+          }
+
+          return (
+            state.eventSource &&
+            (state.eventSource.readyState === EventSource.OPEN ||
+              state.eventSource.readyState === EventSource.CONNECTING)
+          );
+        }
+
+        async function fetchJson(url, options) {
+          const response = await fetch(url, options);
+          let payload = {};
+          try {
+            payload = await response.json();
+          } catch {
+            payload = {};
+          }
+
+          if (!response.ok) {
+            throw new Error(payload.error || `Request failed with ${response.status}`);
+          }
+
+          return payload;
+        }
+
+        function parseChunk(raw) {
+          try {
+            return JSON.parse(raw);
+          } catch {
+            return null;
+          }
+        }
+
+        function onChunk(raw) {
+          const chunk = parseChunk(raw);
+          if (!chunk) {
+            return;
+          }
+
+          if (typeof chunk.error === "string") {
+            addMessage("assistant", chunk.error, "error");
+          }
+
+          if (typeof chunk.delta === "string" && chunk.delta.length > 0) {
+            appendDelta(chunk.delta);
+          }
+
+          if (chunk.done === true) {
+            finishStream();
+          }
+        }
+
+        function toWsUrl(baseUrl) {
+          const url = new URL(baseUrl);
+          url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+          return url.toString().replace(/\/$/, "");
+        }
+
+        async function resolveTransport(baseUrl) {
+          const selected = transportSelect.value;
+          if (selected === "sse" || selected === "websocket") {
+            return selected;
+          }
+
+          const config = await fetchJson(`${baseUrl}/config`);
+          return config.transport === "websocket" ? "websocket" : "sse";
+        }
+
+        async function connect() {
+          const baseUrl = normalizeBaseUrl();
+          const clientId = getClientId();
+
+          closeTransport();
+          setStatus("Connecting...", undefined);
+
+          try {
+            const mode = await resolveTransport(baseUrl);
+            state.connectionType = mode;
+            activeTransport.textContent = `Transport: ${mode}`;
+
+            if (mode === "websocket") {
+              const ws = new WebSocket(
+                `${toWsUrl(baseUrl)}/chat/ws?clientId=${encodeURIComponent(clientId)}`
+              );
+              state.socket = ws;
+
+              await new Promise((resolve, reject) => {
+                const timer = setTimeout(() => {
+                  reject(new Error("WebSocket connect timeout."));
+                }, 10000);
+
+                ws.addEventListener("open", () => {
+                  clearTimeout(timer);
+                  resolve();
+                });
+                ws.addEventListener("error", () => {
+                  clearTimeout(timer);
+                  reject(new Error("WebSocket connection failed."));
+                });
+              });
+
+              ws.addEventListener("message", (event) => onChunk(event.data));
+              ws.addEventListener("close", () => {
+                setStatus("WebSocket disconnected", "error");
+              });
+              ws.addEventListener("error", () => {
+                setStatus("WebSocket error", "error");
+              });
+
+              setStatus("Connected via WebSocket", "ok");
+              return;
+            }
+
+            const source = new EventSource(
+              `${baseUrl}/chat/stream?clientId=${encodeURIComponent(clientId)}`
+            );
+            state.eventSource = source;
+
+            source.onopen = () => {
+              setStatus("Connected via SSE", "ok");
+            };
+            source.onmessage = (event) => onChunk(event.data);
+            source.onerror = () => {
+              setStatus("SSE reconnecting...", "error");
+            };
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : "Failed to connect.";
+            setStatus(message, "error");
+            closeTransport();
+          }
+        }
+
+        async function refreshModels() {
+          const baseUrl = normalizeBaseUrl();
+          modelSelect.innerHTML = "";
+
+          try {
+            const payload = await fetchJson(`${baseUrl}/models`);
+            const models = Array.isArray(payload.models) ? payload.models : [];
+
+            if (models.length === 0) {
+              const option = document.createElement("option");
+              option.value = "";
+              option.textContent = "No models available";
+              modelSelect.appendChild(option);
+              modelSelect.disabled = true;
+              return;
+            }
+
+            modelSelect.disabled = false;
+            for (const model of models) {
+              const option = document.createElement("option");
+              option.value = model.id;
+              const details = [model.vendor, model.family, model.version]
+                .filter(Boolean)
+                .join(" / ");
+              option.textContent = details
+                ? `${model.name} (${details})`
+                : model.name;
+              modelSelect.appendChild(option);
+            }
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : "Failed to load models.";
+            addMessage("assistant", message, "error");
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "Failed to load models";
+            modelSelect.appendChild(option);
+            modelSelect.disabled = true;
+          }
+        }
+
+        async function sendPrompt() {
+          const prompt = promptInput.value.trim();
+          if (!prompt || state.streamActive) {
+            return;
+          }
+
+          if (!isConnected()) {
+            await connect();
+          }
+          if (!isConnected()) {
+            addMessage("assistant", "Not connected to a stream endpoint.", "error");
+            return;
+          }
+
+          addMessage("user", prompt);
+          state.activeAssistantNode = addMessage("assistant", "");
+          setStreamState(true);
+          promptInput.value = "";
+
+          const baseUrl = normalizeBaseUrl();
+          const clientId = getClientId();
+
+          try {
+            await fetchJson(`${baseUrl}/chat`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                prompt,
+                model: modelSelect.value || undefined,
+                clientId
+              })
+            });
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : "Failed to send prompt.";
+            addMessage("assistant", message, "error");
+            finishStream();
+          }
+        }
+
+        async function stopPrompt() {
+          const baseUrl = normalizeBaseUrl();
+          const clientId = getClientId();
+
+          try {
+            await fetchJson(`${baseUrl}/chat/stop`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({ clientId })
+            });
+          } catch {
+            // Ignore stop call errors in demo UI.
+          }
+
+          if (state.connectionType === "websocket" && state.socket) {
+            if (state.socket.readyState === WebSocket.OPEN) {
+              state.socket.send(JSON.stringify({ type: "stop" }));
+            }
+          }
+        }
+
+        connectBtn.addEventListener("click", () => {
+          void connect();
+        });
+
+        disconnectBtn.addEventListener("click", () => {
+          closeTransport();
+        });
+
+        modelsBtn.addEventListener("click", () => {
+          void refreshModels();
+        });
+
+        sendBtn.addEventListener("click", () => {
+          void sendPrompt();
+        });
+
+        stopBtn.addEventListener("click", () => {
+          void stopPrompt();
+        });
+
+        clearBtn.addEventListener("click", () => {
+          chatLog.innerHTML = "";
+          state.activeAssistantNode = null;
+        });
+
+        promptInput.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            void sendPrompt();
+          }
+        });
+
+        window.addEventListener("beforeunload", () => {
+          closeTransport();
+        });
+
+        initClientId();
+        void refreshModels();
+      })();
+    </script>
+  </body>
+</html>

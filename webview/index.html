@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Local AI Bridge</title>
+    <style>
+      :root {
+        --left-width: 320px;
+        --right-width: 420px;
+        --bg: #f3f5f9;
+        --panel: #fff;
+        --text: #152033;
+        --muted: #66758f;
+        --accent: #2455d7;
+        --accent-soft: #dee7ff;
+        --error: #a32525;
+        --border: #d4dae7;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at top left, #dde9ff 0%, transparent 48%),
+          radial-gradient(circle at bottom right, #fef2d4 0%, transparent 42%),
+          var(--bg);
+        color: var(--text);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      }
+
+      .app-shell {
+        height: 100dvh;
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: var(--left-width) 8px minmax(0, 1fr) 8px var(--right-width);
+      }
+
+      .sidebar {
+        overflow: hidden;
+        display: grid;
+        gap: 12px;
+        padding: 14px;
+        background: var(--panel);
+      }
+
+      .left-sidebar {
+        border-right: 1px solid var(--border);
+        grid-template-rows: auto auto auto 1fr;
+      }
+
+      .right-sidebar {
+        border-left: 1px solid var(--border);
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .resizer {
+        position: relative;
+        cursor: col-resize;
+      }
+
+      .resizer::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 6px;
+        bottom: 6px;
+        width: 2px;
+        transform: translateX(-50%);
+        border-radius: 2px;
+        background: #c5cee0;
+      }
+
+      .is-resizing,
+      .is-resizing * {
+        user-select: none !important;
+        cursor: col-resize !important;
+      }
+
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        background: #fbfcff;
+      }
+
+      .app-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 10px;
+      }
+
+      .title {
+        font-size: 19px;
+        font-weight: 700;
+      }
+
+      .version {
+        font-size: 12px;
+        color: var(--muted);
+        background: #edf1fc;
+        padding: 3px 8px;
+        border-radius: 999px;
+      }
+
+      .section-title {
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 8px;
+      }
+
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #b8c4d7;
+      }
+
+      .status-dot.ok {
+        background: #24803e;
+      }
+
+      .status-dot.error {
+        background: var(--error);
+      }
+
+      .meta-grid {
+        margin-top: 10px;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 8px 10px;
+        font-size: 13px;
+      }
+
+      .label {
+        color: var(--muted);
+      }
+
+      .value {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      select,
+      textarea,
+      button {
+        font: inherit;
+      }
+
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px;
+        background: #fff;
+        color: var(--text);
+      }
+
+      button {
+        border: 0;
+        border-radius: 8px;
+        padding: 9px 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      button.primary {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      button.secondary {
+        background: #eff2f9;
+        color: #2a3553;
+      }
+
+      button:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+      }
+
+      .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .chat-pane {
+        overflow: hidden;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        gap: 12px;
+        padding: 14px;
+      }
+
+      .chat-header,
+      .composer {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 10px;
+        background: var(--panel);
+      }
+
+      .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .chat-title {
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .chat-subtitle {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .conversation {
+        overflow-y: auto;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        background: var(--panel);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .message {
+        max-width: 92%;
+        padding: 11px 12px;
+        border-radius: 10px;
+        white-space: pre-wrap;
+        line-height: 1.45;
+      }
+
+      .message.user {
+        align-self: flex-end;
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .message.assistant {
+        align-self: flex-start;
+        background: var(--accent-soft);
+        color: #182342;
+      }
+
+      .message.error {
+        border: 1px solid #e4b4b4;
+        background: #fbe9e9;
+        color: var(--error);
+      }
+
+      .composer textarea {
+        resize: vertical;
+        min-height: 90px;
+        max-height: 240px;
+        margin-bottom: 10px;
+      }
+
+      .log-header {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 10px;
+        background: #fbfcff;
+        display: grid;
+        gap: 8px;
+      }
+
+      .log-header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .log-title {
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .log-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .log-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .log-list {
+        overflow-y: auto;
+        border: 1px solid #202c4b;
+        border-radius: 10px;
+        padding: 8px;
+        background: #0f1526;
+        color: #d8e2ff;
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          "Liberation Mono",
+          "Courier New",
+          monospace;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
+      .log-item {
+        border-bottom: 1px solid #1e2b4d;
+        padding: 6px 2px;
+      }
+
+      .log-item:last-child {
+        border-bottom: 0;
+      }
+
+      .log-meta {
+        color: #9eb2eb;
+      }
+
+      .log-item.out .log-meta {
+        color: #8ed0ff;
+      }
+
+      .log-item.in .log-meta {
+        color: #9de8ba;
+      }
+
+      .log-item.error .log-meta {
+        color: #ffadad;
+      }
+
+      .log-body {
+        margin-top: 2px;
+        color: #d8e2ff;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      @media (max-width: 1100px) {
+        .app-shell {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto auto minmax(0, 1fr);
+          height: auto;
+          min-height: 100vh;
+        }
+
+        .resizer {
+          display: none;
+        }
+
+        .left-sidebar,
+        .right-sidebar {
+          border: 0;
+        }
+
+        .chat-pane {
+          min-height: 620px;
+        }
+
+        body {
+          overflow: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell" id="appShell">
+      <aside class="sidebar left-sidebar">
+        <section class="panel">
+          <div class="app-header">
+            <div class="title">Local AI Bridge</div>
+            <div class="version" id="appVersion">v-</div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">Connection</div>
+          <div class="status">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Connecting...</span>
+          </div>
+          <div class="meta-grid">
+            <div class="label">Transport</div>
+            <div class="value" id="transportLabel">-</div>
+            <div class="label">Port</div>
+            <div class="value" id="portLabel">-</div>
+            <div class="label">Client ID</div>
+            <div class="value" id="clientIdLabel">-</div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">App Config</div>
+          <label for="modelSelect">Model</label>
+          <select id="modelSelect"></select>
+          <div class="row" style="margin-top: 10px">
+            <button class="secondary" id="refreshModelsButton" type="button">
+              Refresh Models
+            </button>
+          </div>
+        </section>
+      </aside>
+
+      <div class="resizer" id="leftResizer" aria-hidden="true"></div>
+
+      <main class="chat-pane">
+        <section class="chat-header">
+          <div class="chat-title">Chat Test</div>
+          <div class="chat-subtitle">Only conversation area scrolls</div>
+        </section>
+
+        <section class="conversation" id="chatLog"></section>
+
+        <section class="composer">
+          <textarea id="promptInput" placeholder="Type a prompt..."></textarea>
+          <div class="row">
+            <button class="primary" id="sendButton" type="button">Send</button>
+            <button class="secondary" id="stopButton" type="button">Stop</button>
+          </div>
+        </section>
+      </main>
+
+      <div class="resizer" id="rightResizer" aria-hidden="true"></div>
+
+      <aside class="sidebar right-sidebar">
+        <section class="log-header">
+          <div class="log-header-top">
+            <div class="log-title">Event Logs</div>
+            <button class="secondary" id="clearLogsButton" type="button">
+              Clear Logs
+            </button>
+          </div>
+          <div class="log-controls">
+            <label class="log-toggle" for="logChunksToggle">
+              <input id="logChunksToggle" type="checkbox" />
+              Show Chunk Logs
+            </label>
+          </div>
+        </section>
+        <section class="log-list" id="eventLog"></section>
+      </aside>
+    </div>
+
+    <script>
+      (() => {
+        const LOG_LIMIT = 500;
+        const CHUNK_LOG_PREF_KEY = "local-ai-bridge-show-chunk-logs";
+        const MIN_LEFT = 260;
+        const MAX_LEFT = 540;
+        const MIN_RIGHT = 320;
+        const MAX_RIGHT = 700;
+
+        const state = {
+          transport: "sse",
+          port: null,
+          version: "0.0.0",
+          clientId: getOrCreateClientId(),
+          streamActive: false,
+          logChunkDeltas: false,
+          suppressedLocalChunkLogs: 0,
+          suppressedBridgeChunkLogs: 0,
+          activeAssistantNode: null,
+          bridgeEventsSource: null,
+          eventSource: null,
+          socket: null,
+        };
+
+        const leftResizer = document.getElementById("leftResizer");
+        const rightResizer = document.getElementById("rightResizer");
+        const appVersion = document.getElementById("appVersion");
+        const chatLog = document.getElementById("chatLog");
+        const eventLog = document.getElementById("eventLog");
+        const promptInput = document.getElementById("promptInput");
+        const sendButton = document.getElementById("sendButton");
+        const stopButton = document.getElementById("stopButton");
+        const clearLogsButton = document.getElementById("clearLogsButton");
+        const logChunksToggle = document.getElementById("logChunksToggle");
+        const modelSelect = document.getElementById("modelSelect");
+        const refreshModelsButton = document.getElementById("refreshModelsButton");
+        const transportLabel = document.getElementById("transportLabel");
+        const portLabel = document.getElementById("portLabel");
+        const clientIdLabel = document.getElementById("clientIdLabel");
+        const statusText = document.getElementById("statusText");
+        const statusDot = document.getElementById("statusDot");
+
+        function getOrCreateClientId() {
+          const key = "local-ai-bridge-client-id";
+          const existing = localStorage.getItem(key);
+          if (existing) return existing;
+          const next = `web-${Math.random().toString(36).slice(2, 11)}`;
+          localStorage.setItem(key, next);
+          return next;
+        }
+
+        function clamp(v, min, max) {
+          return Math.max(min, Math.min(max, v));
+        }
+
+        function px(name, fallback) {
+          const raw = getComputedStyle(document.documentElement).getPropertyValue(name);
+          const n = Number.parseInt(String(raw).trim(), 10);
+          return Number.isFinite(n) ? n : fallback;
+        }
+
+        function setupResizablePanes() {
+          function attach(resizer, side) {
+            resizer.addEventListener("mousedown", (event) => {
+              if (window.matchMedia("(max-width: 1100px)").matches) return;
+              event.preventDefault();
+
+              const startX = event.clientX;
+              const startLeft = px("--left-width", 320);
+              const startRight = px("--right-width", 420);
+              document.body.classList.add("is-resizing");
+
+              const onMove = (e) => {
+                if (side === "left") {
+                  const next = clamp(startLeft + (e.clientX - startX), MIN_LEFT, MAX_LEFT);
+                  document.documentElement.style.setProperty("--left-width", `${next}px`);
+                } else {
+                  const next = clamp(startRight - (e.clientX - startX), MIN_RIGHT, MAX_RIGHT);
+                  document.documentElement.style.setProperty("--right-width", `${next}px`);
+                }
+              };
+
+              const onUp = () => {
+                document.body.classList.remove("is-resizing");
+                window.removeEventListener("mousemove", onMove);
+                window.removeEventListener("mouseup", onUp);
+              };
+
+              window.addEventListener("mousemove", onMove);
+              window.addEventListener("mouseup", onUp);
+            });
+          }
+
+          attach(leftResizer, "left");
+          attach(rightResizer, "right");
+        }
+
+        function formatPayload(payload) {
+          if (payload === undefined) return "";
+          if (typeof payload === "string") return payload;
+          try {
+            return JSON.stringify(payload);
+          } catch {
+            return String(payload);
+          }
+        }
+
+        function truncate(text, max = 700) {
+          return text.length <= max ? text : `${text.slice(0, max)} ...[truncated]`;
+        }
+
+        function addLog(level, message, payload) {
+          const item = document.createElement("div");
+          item.className = `log-item ${String(level).toLowerCase()}`;
+          const meta = document.createElement("div");
+          meta.className = "log-meta";
+          meta.textContent = `${new Date().toLocaleTimeString()} [${level}] ${message}`;
+          item.appendChild(meta);
+
+          if (payload !== undefined) {
+            const body = document.createElement("div");
+            body.className = "log-body";
+            body.textContent = truncate(formatPayload(payload));
+            item.appendChild(body);
+          }
+
+          eventLog.appendChild(item);
+          while (eventLog.children.length > LOG_LIMIT) eventLog.removeChild(eventLog.firstChild);
+          eventLog.scrollTop = eventLog.scrollHeight;
+        }
+
+        function updateMetadata() {
+          transportLabel.textContent = state.transport;
+          portLabel.textContent = state.port == null ? "-" : String(state.port);
+          clientIdLabel.textContent = state.clientId;
+          appVersion.textContent = `v${state.version}`;
+        }
+
+        function setStatus(text, mode) {
+          statusText.textContent = text;
+          statusDot.classList.remove("ok", "error");
+          if (mode === "ok") statusDot.classList.add("ok");
+          if (mode === "error") statusDot.classList.add("error");
+        }
+
+        function setStreaming(streaming) {
+          if (streaming) {
+            state.suppressedLocalChunkLogs = 0;
+          } else if (!state.logChunkDeltas && state.suppressedLocalChunkLogs > 0) {
+            addLog(
+              "EVENT",
+              `Suppressed ${state.suppressedLocalChunkLogs} local per-token chunk log(s)`
+            );
+            state.suppressedLocalChunkLogs = 0;
+          }
+
+          state.streamActive = streaming;
+          sendButton.disabled = streaming;
+          addLog("EVENT", streaming ? "Streaming started" : "Streaming finished");
+        }
+
+        function appendMessage(role, text, extraClass) {
+          const node = document.createElement("div");
+          node.className = `message ${role}${extraClass ? ` ${extraClass}` : ""}`;
+          node.textContent = text;
+          chatLog.appendChild(node);
+          chatLog.scrollTop = chatLog.scrollHeight;
+          return node;
+        }
+
+        function appendAssistantDelta(delta) {
+          if (!state.activeAssistantNode) state.activeAssistantNode = appendMessage("assistant", "");
+          state.activeAssistantNode.textContent += delta;
+          chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        function finalizeStream() {
+          state.activeAssistantNode = null;
+          setStreaming(false);
+        }
+
+        function parsePayload(raw) {
+          try {
+            return JSON.parse(raw);
+          } catch {
+            return null;
+          }
+        }
+
+        function handleChunk(raw, source) {
+          const payload = parsePayload(raw);
+          if (!payload) {
+            addLog("ERROR", `${source} chunk is not valid JSON`, raw);
+            return;
+          }
+
+          if (state.logChunkDeltas) {
+            addLog("IN", `${source} stream chunk`, payload);
+          } else if (typeof payload.error === "string") {
+            addLog("ERROR", `${source} stream error`, payload);
+          } else if (payload.done === true) {
+            addLog("IN", `${source} stream completed`, { done: true });
+          } else if (typeof payload.delta === "string" && payload.delta.length > 0) {
+            state.suppressedLocalChunkLogs += 1;
+          }
+
+          if (typeof payload.error === "string") appendMessage("assistant", payload.error, "error");
+          if (typeof payload.delta === "string" && payload.delta.length > 0) appendAssistantDelta(payload.delta);
+          if (payload.done === true) finalizeStream();
+        }
+
+        async function fetchJson(url, options) {
+          const method = options?.method ?? "GET";
+          const outBody =
+            typeof options?.body === "string" ? parsePayload(options.body) ?? options.body : options?.body;
+          addLog("OUT", `${method} ${url}`, outBody);
+
+          const response = await fetch(url, options);
+          let payload = {};
+          try {
+            payload = await response.json();
+          } catch {
+            payload = {};
+          }
+
+          if (!response.ok) {
+            addLog("ERROR", `${method} ${url} -> ${response.status}`, payload);
+            const message = payload.error || `Request failed with ${response.status}`;
+            throw new Error(message);
+          }
+
+          addLog("IN", `${method} ${url} -> ${response.status}`, payload);
+          return payload;
+        }
+
+        async function loadModels() {
+          const payload = await fetchJson("/models");
+          const models = Array.isArray(payload.models) ? payload.models : [];
+          modelSelect.innerHTML = "";
+
+          if (models.length === 0) {
+            addLog("EVENT", "No models available from /models");
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "No models available";
+            modelSelect.appendChild(option);
+            modelSelect.disabled = true;
+            return;
+          }
+
+          addLog("EVENT", `Loaded ${models.length} model(s)`);
+          modelSelect.disabled = false;
+          for (const model of models) {
+            const option = document.createElement("option");
+            option.value = model.id;
+            const details = [model.vendor, model.family, model.version].filter(Boolean).join(" / ");
+            option.textContent = details ? `${model.name} (${details})` : model.name;
+            modelSelect.appendChild(option);
+          }
+        }
+
+        function closeCurrentTransport() {
+          if (state.eventSource) {
+            addLog("EVENT", "Closing SSE connection");
+            state.eventSource.close();
+            state.eventSource = null;
+          }
+
+          if (state.socket) {
+            addLog("EVENT", "Closing WebSocket connection");
+            state.socket.close();
+            state.socket = null;
+          }
+        }
+
+        function connectTransport() {
+          closeCurrentTransport();
+
+          if (state.transport === "websocket") {
+            const protocol = location.protocol === "https:" ? "wss" : "ws";
+            const url = `${protocol}://${location.host}/chat/ws?clientId=${encodeURIComponent(state.clientId)}`;
+            addLog("OUT", "Opening WebSocket stream", { url });
+            const socket = new WebSocket(url);
+            state.socket = socket;
+
+            socket.addEventListener("open", () => {
+              setStatus("Connected via WebSocket", "ok");
+              addLog("EVENT", "WebSocket connected");
+            });
+            socket.addEventListener("message", (event) => handleChunk(event.data, "WS"));
+            socket.addEventListener("close", () => {
+              setStatus("WebSocket disconnected", "error");
+              addLog("EVENT", "WebSocket disconnected");
+            });
+            socket.addEventListener("error", () => {
+              setStatus("WebSocket error", "error");
+              addLog("ERROR", "WebSocket transport error");
+            });
+            return;
+          }
+
+          const streamUrl = `/chat/stream?clientId=${encodeURIComponent(state.clientId)}`;
+          addLog("OUT", "Opening SSE stream", { url: streamUrl });
+          const source = new EventSource(streamUrl);
+          state.eventSource = source;
+
+          source.onopen = () => {
+            setStatus("Connected via SSE", "ok");
+            addLog("EVENT", "SSE connected");
+          };
+          source.onmessage = (event) => handleChunk(event.data, "SSE");
+          source.onerror = () => {
+            setStatus("SSE reconnecting...", "error");
+            addLog("ERROR", "SSE error/reconnect");
+          };
+        }
+
+        function closeBridgeEventStream() {
+          if (state.bridgeEventsSource) {
+            addLog("EVENT", "Closing bridge event stream");
+            state.bridgeEventsSource.close();
+            state.bridgeEventsSource = null;
+          }
+        }
+
+        function isDeltaChunkPayload(payload) {
+          return Boolean(
+            payload &&
+              typeof payload === "object" &&
+              typeof payload.delta === "string" &&
+              payload.delta.length > 0 &&
+              payload.done === false
+          );
+        }
+
+        function handleBridgeEvent(rawPayload) {
+          if (!rawPayload || typeof rawPayload !== "object") {
+            addLog("ERROR", "Bridge event payload has invalid shape", rawPayload);
+            return;
+          }
+
+          const source = typeof rawPayload.source === "string" ? rawPayload.source : "bridge";
+          const direction =
+            typeof rawPayload.direction === "string" ? rawPayload.direction.toUpperCase() : "EVENT";
+          const message =
+            typeof rawPayload.message === "string" ? rawPayload.message : "Bridge event";
+          const data = rawPayload.data;
+
+          if (!state.logChunkDeltas && source === "stream") {
+            if (isDeltaChunkPayload(data)) {
+              state.suppressedBridgeChunkLogs += 1;
+              return;
+            }
+
+            if (
+              data &&
+              typeof data === "object" &&
+              data.done === true &&
+              state.suppressedBridgeChunkLogs > 0
+            ) {
+              addLog(
+                "EVENT",
+                `Suppressed ${state.suppressedBridgeChunkLogs} bridge per-token chunk log(s)`
+              );
+              state.suppressedBridgeChunkLogs = 0;
+            }
+          }
+
+          addLog(direction, `BRIDGE/${source}: ${message}`, data);
+        }
+
+        function connectBridgeEventStream() {
+          closeBridgeEventStream();
+          addLog("OUT", "Opening bridge event stream", { url: "/events" });
+
+          const source = new EventSource("/events");
+          state.bridgeEventsSource = source;
+
+          source.onopen = () => addLog("EVENT", "Bridge event stream connected");
+          source.onmessage = (event) => {
+            const payload = parsePayload(event.data);
+            if (!payload) {
+              addLog("ERROR", "Bridge event payload is not valid JSON", event.data);
+              return;
+            }
+            handleBridgeEvent(payload);
+          };
+          source.onerror = () => addLog("ERROR", "Bridge event stream error/reconnecting");
+        }
+
+        async function sendPrompt() {
+          const prompt = promptInput.value.trim();
+          if (!prompt || state.streamActive) return;
+
+          appendMessage("user", prompt);
+          state.activeAssistantNode = appendMessage("assistant", "");
+          setStreaming(true);
+          promptInput.value = "";
+
+          try {
+            await fetchJson("/chat", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                prompt,
+                model: modelSelect.value || undefined,
+                clientId: state.clientId,
+              }),
+            });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Failed to send prompt.";
+            appendMessage("assistant", message, "error");
+            addLog("ERROR", "Prompt request failed", message);
+            finalizeStream();
+          }
+        }
+
+        async function stopPrompt() {
+          try {
+            await fetchJson("/chat/stop", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ clientId: state.clientId }),
+            });
+          } catch {
+            addLog("ERROR", "Stop request failed");
+          }
+
+          if (
+            state.transport === "websocket" &&
+            state.socket &&
+            state.socket.readyState === WebSocket.OPEN
+          ) {
+            const stopSignal = { type: "stop" };
+            addLog("OUT", "WS stop signal", stopSignal);
+            state.socket.send(JSON.stringify(stopSignal));
+          }
+        }
+
+        function initializeLogPreferences() {
+          const enabled = localStorage.getItem(CHUNK_LOG_PREF_KEY) === "true";
+          state.logChunkDeltas = enabled;
+          logChunksToggle.checked = enabled;
+          addLog("EVENT", enabled ? "Chunk logs enabled" : "Chunk logs hidden (summary mode)");
+        }
+
+        async function initialize() {
+          updateMetadata();
+          addLog("EVENT", "Initializing built-in web UI", { clientId: state.clientId });
+          connectBridgeEventStream();
+          setStatus("Loading...", undefined);
+
+          try {
+            const config = await fetchJson("/config");
+            state.transport = config.transport === "websocket" ? "websocket" : "sse";
+            state.port = typeof config.port === "number" ? config.port : state.port;
+            state.version = typeof config.version === "string" ? config.version : state.version;
+            updateMetadata();
+            addLog("EVENT", "Runtime config loaded", {
+              transport: state.transport,
+              port: state.port,
+              version: state.version,
+            });
+
+            await loadModels();
+            connectTransport();
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : "Failed to initialize chat page.";
+            setStatus(message, "error");
+            addLog("ERROR", "Initialization failed", message);
+          }
+        }
+
+        sendButton.addEventListener("click", () => void sendPrompt());
+        stopButton.addEventListener("click", () => void stopPrompt());
+        clearLogsButton.addEventListener("click", () => {
+          eventLog.innerHTML = "";
+          addLog("EVENT", "Logs cleared");
+        });
+        logChunksToggle.addEventListener("change", () => {
+          const enabled = Boolean(logChunksToggle.checked);
+          state.logChunkDeltas = enabled;
+          localStorage.setItem(CHUNK_LOG_PREF_KEY, String(enabled));
+          addLog("EVENT", enabled ? "Chunk logs enabled" : "Chunk logs hidden (summary mode)");
+        });
+        refreshModelsButton.addEventListener("click", () => {
+          void loadModels().catch((error) => {
+            const message =
+              error instanceof Error ? error.message : "Failed to refresh models.";
+            appendMessage("assistant", message, "error");
+            addLog("ERROR", "Refresh models failed", message);
+          });
+        });
+        promptInput.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            void sendPrompt();
+          }
+        });
+        window.addEventListener("beforeunload", () => {
+          closeCurrentTransport();
+          closeBridgeEventStream();
+        });
+
+        setupResizablePanes();
+        initializeLogPreferences();
+        void initialize();
+      })();
+    </script>
+  </body>
+</html>
